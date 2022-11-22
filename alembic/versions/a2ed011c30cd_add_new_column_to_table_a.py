@@ -17,7 +17,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(table_name='tableA', column=Column('issuer', String()), schema='mySchema')
+    op.add_column(table_name='tableA', column=sa.Column('issuer', sa.String()), schema='mySchema')
 
 
 def downgrade() -> None:
