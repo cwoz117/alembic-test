@@ -1,7 +1,7 @@
-create schema if not exists mySchema;
+create schema if not exists myschema;
 
 
-create table if not exists mySchema.tableA (
+create table if not exists myschema.tableA (
 	id int
 	, Contract_id int
 	, Executed_by int
@@ -9,7 +9,7 @@ create table if not exists mySchema.tableA (
 ) DISTSTYLE AUTO SORTKEY(Contract_id);
 
 
-create table if not exists mySchema.tableB (
+create table if not exists myschema.tableB (
 	id int
 	, Contract_id int
 	, Executed_by int
@@ -17,7 +17,7 @@ create table if not exists mySchema.tableB (
 ) DISTSTYLE AUTO SORTKEY(Contract_id);
 
 
-create table if not exists mySchema.tableC (
+create table if not exists myschema.tableC (
 	id int
 	, Contract_id int
 	, Executed_by int
@@ -25,5 +25,5 @@ create table if not exists mySchema.tableC (
 ) DISTSTYLE AUTO SORTKEY(Contract_id);
 
 
-create or replace view mySchema.v_myView as
+create or replace view myschema.v_myView as
 	select * from mySchema.tableA;

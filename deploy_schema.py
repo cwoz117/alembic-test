@@ -10,9 +10,9 @@ def run_redshift_query(query : str) -> str:
         queries += f.read()
 
     response = client.batch_execute_statement(
-        WorkgroupName='tc-test-cluster',
+        WorkgroupName='tc-workgroup',
         Database='tc-test-database',
-        #DbUser='Admin',
+        #DbUser='admin',
         SecretArn='arn:aws:secretsmanager:us-east-1:135143936609:secret:test/redshift/password-LjFt2k',
         Sqls=[
             queries	
