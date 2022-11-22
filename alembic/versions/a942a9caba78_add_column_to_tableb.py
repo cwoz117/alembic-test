@@ -17,9 +17,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column('TableB', sa.Column('created', sa.DateTime))
+    op.add_column('tableb', sa.Column('created', sa.DateTime), schema="myschema")
 
 
 
 def downgrade() -> None:
-    op.drop_column('TableB', sa.Column('created'))
+    op.drop_column('tableb', sa.Column('created'), schema="myschema")
