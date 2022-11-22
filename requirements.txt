@@ -1,0 +1,3 @@
+alembic
+redshift-connector
+sqlalchemy-redshift
