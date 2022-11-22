@@ -11,7 +11,7 @@ def run_redshift_query(query : str) -> str:
 
     response = client.batch_execute_statement(
         WorkgroupName='tc-workgroup',
-        Database='tc-test-database',
+        Database='dev_chris',
         #DbUser='admin',
         SecretArn='arn:aws:secretsmanager:us-east-1:135143936609:secret:test/redshift/password-LjFt2k',
         Sqls=[
