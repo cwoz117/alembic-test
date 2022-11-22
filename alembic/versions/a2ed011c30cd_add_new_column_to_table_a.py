@@ -21,5 +21,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column(table_name='tableA', column=sa.Column('issuer', sa.String()), schema='myschema')
+    op.drop_column(table_name='tableA', column='issuer', schema='myschema')
 
