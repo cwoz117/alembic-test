@@ -44,20 +44,8 @@ def run_redshift(dbname:str, query:str) -> list:
     
     return values
 
-if __name__ == '__main__':
-
-    dbname = 'dev_ali'
-
-    # getting a list of tables for the schema
-    schemaname = 'myschema'
-    listtables_qry =f"""select t.table_name
-                    from information_schema.tables t
-                    where t.table_schema = '{schemaname}'
-                    and t.table_type = 'BASE TABLE'
-                    order by t.table_name;"""
-    tablelist = run_redshift(dbname=dbname, query=listtables_qry)
-
-    # # making the unload quries
+def run_unloads(tablelist):
+    # making the unload quries
     unload_table_qrys = []
     for tablename in tablelist:
         bucket_name = f's3://tc-backup-bucket/{tablename[0]}/'
@@ -74,3 +62,43 @@ if __name__ == '__main__':
     logging.warning('running unload queries...')
     run_redshift(dbname=dbname, query=unload_table_qrys)
     logging.warning('Done.')
+
+def run_copies(tablelist):
+    # making the copy quries
+    copy_table_qrys = []
+    for tablename in tablelist:
+        bucket_name = f's3://tc-backup-bucket/{tablename[0]}/'
+        copy_query = f"""copy myschema.{tablename[0]}
+                           from 's3://tc-backup-bucket/{tablename[0]}/' 
+                           iam_role 'arn:aws:iam::135143936609:role/service-role/AmazonRedshift-CommandsAccessRole-20221115T143141';
+                        """
+        copy_table_qrys.append(copy_query)
+    
+    copy_table_qrys = '\n'.join(copy_table_qrys)
+        
+    # running the unload queries    
+    logging.warning('running copy queries...')
+    run_redshift(dbname=dbname, query=copy_table_qrys)
+    logging.warning('Done.')
+
+if __name__ == '__main__':
+
+    dbname = 'dev_ali'
+
+    # getting a list of tables for the schema
+    schemaname = 'myschema'
+    listtables_qry =f"""select t.table_name
+                    from information_schema.tables t
+                    where t.table_schema = '{schemaname}'
+                    and t.table_type = 'BASE TABLE'
+                    order by t.table_name;"""
+    tablelist = run_redshift(dbname=dbname, query=listtables_qry)
+
+    run_unloads(tablelist)
+    run_copies(tablelist)
+    
+
+
+
+
+
