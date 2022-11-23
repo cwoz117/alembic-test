@@ -1,40 +1,76 @@
 import boto3
 
+import logging
 
-client = boto3.client('redshift-data')
+def run_redshift(dbname:str, query:str) -> list:
+    client = boto3.client('redshift-data', region_name='us-east-1')
 
-response = client.execute_statement(
-    Database='tc-test-database',
-    SecretArn='arn:aws:secretsmanager:us-east-1:135143936609:secret:test/redshift/password-LjFt2k',
+    response = client.execute_statement(
+        WorkgroupName='tc-workgroup',
+        Database=dbname,
+        SecretArn='arn:aws:secretsmanager:us-east-1:135143936609:secret:test/redshift/password-LjFt2k',
+        Sql=query,
+        StatementName='tc-test-deploy',
+        WithEvent=False,
+    )
 
-    Sql="""
-        unload ('select * from myschema.tablea')
-        to 's3://tc-backup-bucket/tablea/' 
-        iam_role 'arn:aws:iam::135143936609:role/service-role/AmazonRedshift-CommandsAccessRole-20221115T143141';
+    # cheking query status
+    status ='PICKED'        
+    while status in ['SUBMITTED','PICKED','STARTED']:
+        state = client.describe_statement(Id=response['Id'])
+        status = state['Status']        
+    logging.warning(f"query status: {status}")
+
+    error = None
+    if 'Error' in state:
+        error = state['Error']
+        print(error)
+
+    logging.warning(f"query result size: {state['ResultSize']}")
         
-        unload ('select * from myschema.tableb')
-        to 's3://tc-backup-bucket/tableb/' 
-        iam_role 'arn:aws:iam::135143936609:role/service-role/AmazonRedshift-CommandsAccessRole-20221115T143141';
+    values = []        
+    if state['ResultSize']>0:
+        result = {'NextToken':''}
+        while ('NextToken' in result):            
+            result = client.get_statement_result(Id=response['Id'], NextToken=result['NextToken'])
+            for record in result['Records']:
+                attrvalues = []
+                for attr in record:
+                    # need to recognize if the value is null or not
+                    # format for attr is `{'longValue': 633472}` so 
+                    # there is only one value in values()
+                    attrvalues += [None if 'isNull' in attr else list(attr.values())[0]]
+                values += [attrvalues]
+    
+    return values
+
+if __name__ == '__main__':
+
+    dbname = 'dev_ali'
+
+    # getting a list of tables for the schema
+    schemaname = 'myschema'
+    listtables_qry =f"""select t.table_name
+                    from information_schema.tables t
+                    where t.table_schema = '{schemaname}'
+                    and t.table_type = 'BASE TABLE'
+                    order by t.table_name;"""
+    tablelist = run_redshift(dbname=dbname, query=listtables_qry)
+
+    # # making the unload quries
+    unload_table_qrys = []
+    for tablename in tablelist:
+        bucket_name = f's3://tc-backup-bucket/{tablename[0]}/'
+        unload_query = f"""unload ('select * from myschema.{tablename[0]}')
+                           to '{bucket_name}'
+                           iam_role 'arn:aws:iam::135143936609:role/service-role/AmazonRedshift-CommandsAccessRole-20221115T143141'
+                           ALLOWOVERWRITE;
+                        """
+        unload_table_qrys.append(unload_query)
+    
+    unload_table_qrys = '\n'.join(unload_table_qrys)
         
-        unload ('select * from myschema.tablec')
-        to 's3://tc-backup-bucket/tablec/' 
-        iam_role 'arn:aws:iam::135143936609:role/service-role/AmazonRedshift-CommandsAccessRole-20221115T143141';
-        
-        """,
-    StatementName='unload',
-    WithEvent=False,
-    WorkgroupName='tc-workgroup'
-)
-
-
-# cheking query status
-status ='PICKED'        
-while status in ['SUBMITTED','PICKED','STARTED']:
-    state = client.describe_statement(Id=response['Id'])
-    status = state['Status']        
-print(f"query status: {status}")
-
-error = None
-if 'Error' in state:
-    error = state['Error']
-    print(error)
+    # running the unload queries    
+    logging.warning('running unload queries...')
+    run_redshift(dbname=dbname, query=unload_table_qrys)
+    logging.warning('Done.')

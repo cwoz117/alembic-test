@@ -3,19 +3,19 @@ import sys
 import boto3
 
 def run_redshift_query(query : str) -> str:
-    client = boto3.client('redshift-data')
+    client = boto3.client('redshift-data', region_name='us-east-1')
     queries = ""
-    
+
     with open(sys.argv[1]) as f:
         queries += f.read()
 
     response = client.batch_execute_statement(
         WorkgroupName='tc-workgroup',
-        Database='dev_chris',
+        Database='dev_ali',
         #DbUser='admin',
         SecretArn='arn:aws:secretsmanager:us-east-1:135143936609:secret:test/redshift/password-LjFt2k',
         Sqls=[
-            queries	
+            queries
         ],
         StatementName='tc-test-deploy',
         WithEvent=False,
