@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 import argparse
+import tcbuild
 
 def create_db(args):
-    print(f"create {args.name}")
+    #if not tcbuild.check_db_exists(args.name):
+    #    tcbuild.create_database(args.name)
+    tcbuild.check_db_exists()
+
+def rebuild(args):
+    # drop schema check to make sure its only a dev account
+    print(f"drop {args.name} schema")
 
 def backup_db(args):
     print(f"saving {args.name}")
