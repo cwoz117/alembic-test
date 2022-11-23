@@ -4,9 +4,8 @@ import toml
 import tcbuild
 
 def create_db(env, args):
-    #if not tcbuild.check_db_exists(env, args.name):
-    #    tcbuild.create_database(env, args.name)
-    if not tcbuild.check_db_exists(env.arn.redshift, args.name):
+    if not tcbuild.check_db_exists(env, args.name):
+        #tcbuild.create_database(env, args.name)
         print(f"{args.name} does not exist!")
     else:
         print(f"{args.name} exists!")
