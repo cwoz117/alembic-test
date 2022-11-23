@@ -3,3 +3,4 @@ redshift-connector
 sqlalchemy-redshift
 alembic_utils
 boto3
+toml
