@@ -7,7 +7,22 @@ class Database:
         self.schema     = env.get('redshift').get('schema')
         self.secretsArn = env.get('redshift').get('credentials')
         self.client     = boto3.client('redshift-data')
-        
+
+    def read_results(self,response):
+        # Also 3 nested for loops for what could be alot of data
+        # needs to be looked at.
+        result = {'NextToken':''}
+        while ('NextToken' in result):
+            result = self.client.get_statement_result(Id=response['Id'], NextToken=result['NextToken'])
+            print(result)
+            for record in result['Records']:
+                attrvalues = []
+                for attr in record:
+                    # Attr type: longValue (633472), Cannot see null so make it None, and only grab one value
+                    attrvalues += [None if 'isNull' in attr else list(attr.values())[0]]
+                values += [attrvalues]
+        return values
+    
     def send_query(self, query):
         response = self.client.execute_statement(
             WorkgroupName=self.cluster,
@@ -24,21 +39,9 @@ class Database:
         if 'Error' in state: print(state['Error'])
         #return status, state
 
-        # TODO make a read_results() function
-        # Also 3 nested for loops for what could be alot of data
-        # needs to be looked at.
         values = []
         if state['ResultSize'] > 0:
-            result = {'NextToken':''}
-            while ('NextToken' in result):
-                result = self.client.get_statement_result(Id=response['Id'], NextToken=result['NextToken'])
-                print(result)
-                for record in result['Records']:
-                    attrvalues = []
-                    for attr in record:
-                        # Attr type: longValue (633472), Cannot see null so make it None, and only grab one value
-                        attrvalues += [None if 'isNull' in attr else list(attr.values())[0]]
-                    values += [attrvalues]
+            values = self.read_results(response)
         return values, state
 
     def deploy_base_schema(self, schema_ddl):
@@ -58,7 +61,7 @@ class Database:
 
         status ='PICKED'
         while status in ['SUBMITTED','PICKED','STARTED']:
-            state = client.describe_statement(response.get('Id'))
+            state = self.client.describe_statement(response.get('Id'))
             status = state['Status']
         if 'Error' in state: print(state['Error'])
         return status
@@ -73,7 +76,7 @@ class Database:
         return self.send_query(query)
 
     def backup_schema(self, bucket, iam):
-        tables = list_tables()
+        tables, _ = self.list_tables()
         queries = ""
         for table in tables:
             bucket_name = f's3://{bucket}/{table[0]}/'
@@ -84,10 +87,13 @@ class Database:
                     """
             queries += query + '\n'
         result, _ = self.send_query(queries)
+
+        # NOTE: the `result` will be empty (?) as it is an unload operation
+        # maybe we return error if any (??)
         return result
 
     def restore_schema(self, bucket, iam):
-        tables = list_tables()
+        tables, _ = self.list_tables()
         queries = ""
         for table in tables:
             bucket_name = f's3://{bucket}/{table[0]}/'
@@ -97,19 +103,27 @@ class Database:
                      """
             queries += query + "\n"
         result, _ = self.send_query(queries)
+        
+        # NOTE: the `result` will be empty (?) as it is a copy operation
+        # maybe we return error if any (??)
         return result
 
     def exists(self, dbName):
         query='SELECT datname FROM pg_database;'
         databases, _ = self.send_query(query)
+        
+        # NOTE: the returned `databases` structure would be [['dev_chris'],['dev_rich'],['dev_ali'],...] 
+        # so the below syntax might not find the db even if it is in the list
+        
+        # suggestion (i know it is not as clean): return True if dbName in [db[0] for db in databases] else False
         return True if dbName in databases else False
 
     def create_database(self, dbName):
         query = f"create database {dbName};"
-        _, error = run_redshift(query)
+        _, error = self.send_query(query)
         return not bool(error)
 
     def drop_database(self, dbName):
         query = f"drop database {dbName};"
-        _, error = run_redshift(query)
+        _, error = self.send_query(query)
         return not bool(error)
