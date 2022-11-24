@@ -111,12 +111,7 @@ class Database:
     def exists(self, dbName):
         query='SELECT datname FROM pg_database;'
         databases, _ = self.send_query(query)
-        
-        # NOTE: the returned `databases` structure would be [['dev_chris'],['dev_rich'],['dev_ali'],...] 
-        # so the below syntax might not find the db even if it is in the list
-        
-        # suggestion (i know it is not as clean): return True if dbName in [db[0] for db in databases] else False
-        return True if dbName in databases else False
+        return True if dbName in [db[0] for db in databases] else False
 
     def create_database(self, dbName):
         query = f"create database {dbName};"
