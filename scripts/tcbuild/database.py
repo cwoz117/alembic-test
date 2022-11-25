@@ -1,4 +1,5 @@
 import boto3
+import logging
 
 class Database:
     def __init__(self, env, target):
@@ -12,9 +13,9 @@ class Database:
         # Also 3 nested for loops for what could be alot of data
         # needs to be looked at.
         result = {'NextToken':''}
+        values = []
         while ('NextToken' in result):
             result = self.client.get_statement_result(Id=response['Id'], NextToken=result['NextToken'])
-            print(result)
             for record in result['Records']:
                 attrvalues = []
                 for attr in record:
@@ -23,7 +24,8 @@ class Database:
                 values += [attrvalues]
         return values
     
-    def send_query(self, query):
+    def send_query(self, query, default="hello"):
+
         response = self.client.execute_statement(
             WorkgroupName=self.cluster,
             Database=self.database,
@@ -36,8 +38,7 @@ class Database:
         while status in ['SUBMITTED','PICKED','STARTED']:
             state = self.client.describe_statement(Id=response.get('Id'))
             status = state['Status']
-        if 'Error' in state: print(state['Error'])
-        #return status, state
+        if 'Error' in state: logging.warn(state['Error'])
 
         values = []
         if state['ResultSize'] > 0:
@@ -63,7 +64,7 @@ class Database:
         while status in ['SUBMITTED','PICKED','STARTED']:
             state = self.client.describe_statement(response.get('Id'))
             status = state['Status']
-        if 'Error' in state: print(state['Error'])
+        if 'Error' in state: logging.warn(state['Error'])
         return status
 
     def list_tables(self):
@@ -75,43 +76,43 @@ class Database:
                 """
         return self.send_query(query)
 
-    def backup_schema(self, bucket, iam):
+    def backup_data(self, bucket, iam):
+        logging.info("backup_schema: start")
         tables, _ = self.list_tables()
         queries = ""
+        logging.info("backup_schema: grabbed list of tables")
         for table in tables:
             bucket_name = f's3://{bucket}/{table[0]}/'
             query = f"""unload ('select * from {self.schema}.{table[0]}')
                         to '{bucket_name}'
-                        iam_role {iam}
+                        iam_role '{iam}'
                         ALLOWOVERWRITE;
                     """
             queries += query + '\n'
-        result, _ = self.send_query(queries)
+        logging.info("backup_schema: generated query")
+        _, error  = self.send_query(queries)
+        logging.info("backup_schema: executed query")
+        return not bool (error)
 
-        # NOTE: the `result` will be empty (?) as it is an unload operation
-        # maybe we return error if any (??)
-        return result
-
-    def restore_schema(self, bucket, iam):
+    def restore_data(self, bucket, iam):
         tables, _ = self.list_tables()
         queries = ""
         for table in tables:
-            bucket_name = f's3://{bucket}/{table[0]}/'
+            bucket_name = f's3://{bucket}/{table[0]}'
             query = f"""copy {self.schema}.{table[0]}
                         from '{bucket_name}/' 
-                        iam_role {iam};
+                        iam_role '{iam}';
                      """
             queries += query + "\n"
-        result, _ = self.send_query(queries)
-        
-        # NOTE: the `result` will be empty (?) as it is a copy operation
-        # maybe we return error if any (??)
-        return result
+        _, error = self.send_query(queries)
+        return not bool (error)
 
     def exists(self, dbName):
+        logging.info(f"calling exists({dbName})")
         query='SELECT datname FROM pg_database;'
-        databases, _ = self.send_query(query)
-        return True if dbName in [db[0] for db in databases] else False
+        response, _ = self.send_query(query)
+        logging.info(response)
+        return True if dbName in [db[0] for db in response] else False
 
     def create_database(self, dbName):
         query = f"create database {dbName};"

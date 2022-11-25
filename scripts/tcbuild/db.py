@@ -1,46 +1,56 @@
 #!/usr/bin/env python3
 import argparse
 import toml
+import logging
 import database
 
-
-# TODO
-# Don't have a good spot to put this as its 1am, not pinging teams with it:
-# https://stackoverflow.com/questions/22178339/is-it-possible-to-store-the-alembic-connect-string-outside-of-alembic-ini/55190497#55190497
-#
-# this shows how to use the env.py file to update the sqlalchemy.url variable
-# in the alembic.ini file using code.
-# So we don't need to add to gitignore, can just make the database be dynamic
-
 def create_db(env):
-    db = database.Database(env, "personal")
-    if not db.exists(db.database):
-        #TODO exists function doesn't match properly, result does contain
-        # a found database, but then says it does not exist
-        # logic error here but too tired to think 'bout it atm
-        print(f"{db.database} does not exist!")
+    dev = database.Database(env, 'dev')
+    dbName = env.get('redshift').get('sandbox').get('database')
+    
+    if not dev.exists(dbName):
+        logging.info(f"{dbName} does not exist!")
+        dev.create_database(dbName)
+        print(f"{dbName} created!")
     else:
-        print(f"{db.database} exists!")
+        print(f"{dbName} exists!")
 
 def backup_db(env):
     db = database.Database(env, "dev")
-    print(f"saving {db.database}")
-
+    logging.info(f"saving {db.database}")
+    db.backup_data(env.get('backup_bucket').get('name'), env.get('backup_bucket').get('iam'))
+    print(f"{db.database} saved")
+  
 def restore_db(env):
-    if args.name == "int_sol":
-        raise argparse.ArgumentTypeError(f"{args.name} is the dev database, don't mess with it.")
-    print(f"restore to {db.database}")
+    logging.info(f"restore db from s3")
+    iam    = env.get('backup_bucket').get('iam')
+    bucket = env.get('backup_bucket').get('name')
+    db = database.Database(env, 'sandbox')
+    db.restore_data(bucket, iam)
+    print(f"{db.database} restored from s3")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="TC Energy database development utility")
-    parser.add_argument('command', choices=['create', 'backup', 'restore'],help='What are we doing to Redshift?')
+    parser.add_argument(
+            'command', choices=['create', 'backup', 'restore'],
+            help='What are we doing to Redshift?')
+    parser.add_argument(
+            '-d', '--debug', help='Log level: DEBUG',
+            action="store_const", dest="loglevel", 
+            const=logging.DEBUG, default=logging.WARNING)
+    parser.add_argument(
+            '-v', '--verbose',
+            help="Be verbose",
+            action="store_const", dest="loglevel", const=logging.INFO)
     
     args = parser.parse_args()
     env = toml.load("env.toml")
+    logging.basicConfig(level=args.loglevel)
 
     dispatch = {
         "backup": backup_db,
         "create": create_db,
-        "restore": restore_db
+        "restore": restore_db,
+        "sync": sync_db
     }
     dispatch[args.command](env)
