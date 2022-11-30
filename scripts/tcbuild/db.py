@@ -6,7 +6,7 @@ import database
 
 
 def create_db(env, dbName):
-    dev = database.Database(env, 'dev')
+    dev = database.Database(env)
     if not dev.exists(dbName):
         logging.info(f"{dbName} does not exist!")
         dev.create_database(dbName)
@@ -15,7 +15,7 @@ def create_db(env, dbName):
         print(f"{dbName} exists!")
 
 def delete_db(env, dbName):
-    dev = database.Database(env, 'dev')
+    dev = database.Database(env)
     if dev.exists(dbName):
         logging.info(f"{dbName} is slated for deletion!")
         dev.drop_database(dbName)
@@ -23,23 +23,20 @@ def delete_db(env, dbName):
     else:
         logging.info(f"{dbName} does not exist!")
 
-
-def backup_db(env):
-    db = database.Database(env, "dev")
+def backup_db(env, dbName):
+    db = database.Database(env)
     logging.info(f"saving {db.database}")
     db.backup_data(env.get('backup_bucket').get('name'), env.get('backup_bucket').get('iam'))
     print(f"{db.database} saved")
   
-def restore_db(env):
+def restore_db(env, dbName):
+    db = database.Database(env)
     logging.info(f"restore db from s3")
     iam    = env.get('backup_bucket').get('iam')
     bucket = env.get('backup_bucket').get('name')
-    db = database.Database(env, 'sandbox')
     db.restore_data(bucket, iam)
     print(f"{db.database} restored from s3")
     dbName = env.get('redshift').get('sandbox').get('database')
-
-    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="TC Energy database development utility")

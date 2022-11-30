@@ -4,7 +4,7 @@ import logging
 class Database:
     def __init__(self, env, target):
         self.cluster    = env.get('redshift').get('cluster')
-        self.database   = env.get('redshift').get(target).get('database')
+        self.database   = env.get('redshift').get('database')
         self.schema     = env.get('redshift').get('schema')
         self.secretsArn = env.get('redshift').get('credentials')
         self.client     = boto3.client('redshift-data')
