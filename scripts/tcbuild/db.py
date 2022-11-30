@@ -5,9 +5,8 @@ import logging
 import database
 
 
-def create_db(env):
+def create_db(env, dbName):
     dev = database.Database(env, 'dev')
-    dbName = env.get('redshift').get('sandbox').get('database')
     if not dev.exists(dbName):
         logging.info(f"{dbName} does not exist!")
         dev.create_database(dbName)
@@ -38,6 +37,7 @@ def restore_db(env):
     db = database.Database(env, 'sandbox')
     db.restore_data(bucket, iam)
     print(f"{db.database} restored from s3")
+    dbName = env.get('redshift').get('sandbox').get('database')
 
     
 
@@ -54,6 +54,11 @@ if __name__ == '__main__':
             '-v', '--verbose',
             help="Be verbose",
             action="store_const", dest="loglevel", const=logging.INFO)
+    parser.add_argument(
+            '-d', '--database',
+            help="Database name",
+            default="")
+
     
     args = parser.parse_args()
     env = toml.load("env.toml")
@@ -63,6 +68,7 @@ if __name__ == '__main__':
         "backup": backup_db,
         "create": create_db,
         "restore": restore_db,
-        "sync": sync_db
+        "sync": sync_db,
+        "drop": delete_db,
     }
-    dispatch[args.command](env)
+    dispatch[args.command](env, args.database)
